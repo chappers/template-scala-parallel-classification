@@ -10,11 +10,14 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.linalg.Vectors
 
+import io.prediction.controller.SanityCheck
+
 import grizzled.slf4j.Logger
 
 case class DataSourceParams(
   appName: String,
-  evalK: Option[Int]  // define the k-fold parameter.
+  evalK: Option[Int],  // define the k-fold parameter.
+  saveData: Option[Boolean]
 ) extends Params
 
 class DataSource(val dsp: DataSourceParams)
@@ -25,6 +28,9 @@ class DataSource(val dsp: DataSourceParams)
 
   override
   def readTraining(sc: SparkContext): TrainingData = {
+
+    println("\nBeginning the `readTraining` step....\n")
+    val saveData:Boolean = if(dsp.saveData.get == None) false else dsp.saveData.get
 
     val labeledPoints: RDD[LabeledPoint] = PEventStore.aggregateProperties(
       appName = dsp.appName,
@@ -50,6 +56,14 @@ class DataSource(val dsp: DataSourceParams)
           }
         }
       }.cache()
+
+    println(s"\nThe number of points read in for training is: ${labeledPoints.count}")
+
+    if (saveData) {
+      println("\n\nData dump:")
+      println(labeledPoints.map{x => x.toString}.collect().mkString("\n"))
+      println("\n\n")
+    }
 
     new TrainingData(labeledPoints)
   }
@@ -111,4 +125,8 @@ class DataSource(val dsp: DataSourceParams)
 
 class TrainingData(
   val labeledPoints: RDD[LabeledPoint]
-) extends Serializable
+) extends Serializable {
+  override def toString = {
+    labeledPoints.map{ x => x.toString }.take(5).mkString("\n")
+  }
+}
